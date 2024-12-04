@@ -1,11 +1,11 @@
 #### Preamble ####
-# Purpose: Cleans the raw plane data recorded by two observers..... [...UPDATE THIS...]
-# Author: Rohan Alexander [...UPDATE THIS...]
-# Date: 6 April 2023 [...UPDATE THIS...]
-# Contact: rohan.alexander@utoronto.ca [...UPDATE THIS...]
+# Purpose: Re deal with the clean data and make it fit for study
+# Author: Ruikang Wang (1008238872)
+# Date: 3 December 2024
+# Contact: ruikang.wang@utoronto.ca
 # License: MIT
-# Pre-requisites: [...UPDATE THIS...]
-# Any other information needed? [...UPDATE THIS...]
+# Pre-requisites: run 02-download_data.sql
+# reminder, sql is not R, you may use the sql compiler
 
 #### Workspace setup ####
 library(tidyverse)
@@ -16,8 +16,8 @@ clean_data <- read_csv("data/02-analysis_data/clean_data.csv")
 #### Clean data ####
 # Load necessary library
 library(dplyr)
+library(lubridate)
 
-# Assuming your dataset is named "clean_data" and already imported
 
 clean_data <- clean_data %>%
   mutate(
@@ -41,55 +41,48 @@ clean_data <- clean_data %>%
     )
   )
 
-head(clean_data)
-write_csv(clean_data, here("data", "02-analysis_data", "analysis_data.csv"))
 
-
-
-
-
-
-
-# Step 1: Ensure data is sorted by product_id and nowtime
+# Convert 'nowtime' to DateTime format in the `clean_data` dataset
 clean_data <- clean_data %>%
-  arrange(product_id, nowtime) # Sort data by product_id and time
+  mutate(nowtime = as.POSIXct(nowtime, format = "%Y-%m-%d %H:%M:%S"))
 
-# Step 2: Detect price changes and calculate the count of changes
-price_change_data <- clean_data %>%
-  group_by(product_id) %>%
-  mutate(price_change = ifelse(current_price != lag(current_price), 1, 0)) %>% # Flag price changes
-  summarise(times_price_changed = sum(price_change, na.rm = TRUE)) # Count the price changes
+# Remove rows where 'nowtime' is before '2024-08-01'
+filtered_data <- clean_data %>%
+  filter(nowtime >= as.POSIXct("2024-08-01"))
 
-# Step 3: View the new dataset
-print(price_change_data)
+# View the filtered data
+head(filtered_data)
 
-# Step 4: Save the new dataset to a CSV file if needed
-# write.csv(price_change_data, "price_change_data.csv", row.names = FALSE)
+write_csv(filtered_data, here("data", "02-analysis_data", "analysis_data.csv"))
 
 
 
 
+# Convert 'nowtime' to Date format
+analysis_data <- filtered_data %>%
+  mutate(date = as.Date(nowtime, format = "%Y-%m-%d"))
+
+# Sort the data by product_id, vendor, and date
+analysis_data <- analysis_data %>%
+  arrange(product_id, vendor, date)
+
+# Calculate price change and filter only rows where price changed
+price_change_data <- analysis_data %>%
+  group_by(product_id, vendor) %>%
+  mutate(
+    price_change = as.numeric(current_price) - as.numeric(lag(current_price)), # Calculate the price change
+    change_date = date, # The date of the current row
+    old_price = lag(current_price) # The previous day's price
+  ) %>%
+  filter(!is.na(price_change) & price_change != 0) %>% # Filter rows where price change occurred
+  ungroup() %>%
+  select(change_date, price_change, product_id, vendor, product_name, old_price)
+
+# View the resulting dataset
+head(price_change_data)
+
+write_csv(price_change_data, here("data", "02-analysis_data", "price_change_data.csv"))
 
 
 
 
-# Load necessary library
-library(dplyr)
-
-# Load data from the CSV file
-data <- read_csv(file = "D:/汪瑞康/U of T/2024/Fall/sta304/final program/starter_folder-main/data/01-raw_data/hammer-4-product.csv", 
-                 show_col_types = FALSE)
-
-# Remove duplicate rows
-cleaned_data <- data %>%
-  distinct()
-
-# Handle missing values by dropping rows with any missing values
-cleaned_data <- cleaned_data %>%
-  drop_na()
-
-# Display summary of cleaned data
-print(summary(cleaned_data))
-
-# Save the cleaned data to a new CSV file
-# write.csv(cleaned_data, "D:/汪瑞康/U of T/2024/Fall/sta304/final program/starter_folder-main/data/02-analysis_data/cleaned_hammer_product.csv", row.names = FALSE)

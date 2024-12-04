@@ -1,89 +1,57 @@
 #### Preamble ####
-# Purpose: Tests the structure and validity of the simulated Australian 
-  #electoral divisions dataset.
-# Author: Rohan Alexander
-# Date: 26 September 2024
-# Contact: rohan.alexander@utoronto.ca
+# Purpose: Tests the structure and validity of the simulated Canadian food price
+# Author: Ruikang Wang (1008238872)
+# Date: 3 December 2024
+# Contact: ruikang.wang@utoronto.ca
 # License: MIT
 # Pre-requisites: 
-  # - The `tidyverse` package must be installed and loaded
+  # - The `tidyverse`, 'testthat' package must be installed and loaded
   # - 00-simulate_data.R must have been run
-# Any other information needed? Make sure you are in the `starter_folder` rproj
 
 
 #### Workspace setup ####
 library(tidyverse)
-
-analysis_data <- read_csv("data/00-simulated_data/simulated_data.csv")
-
-# Test if the data was successfully loaded
-if (exists("analysis_data")) {
-  message("Test Passed: The dataset was successfully loaded.")
-} else {
-  stop("Test Failed: The dataset could not be loaded.")
-}
+library(testthat)
+sim_data <- read_csv("data/00-simulated_data/simulated_data.csv")
 
 
-#### Test data ####
+# Define vendors and products as per simulation
+vendors <- c("Metro", "Loblaws", "NoFrills", "SaveOnFoods", "TandT", "Voila", "Walmart")
+products <- c("Smoked Classic Cut Bacon", "Omega 3 Eggs", "Lactose-Free 2% Milk", "100% Whole Grain Ancient with Quinoa Bread")
 
-# Check if the dataset has 151 rows
-if (nrow(analysis_data) == 151) {
-  message("Test Passed: The dataset has 151 rows.")
-} else {
-  stop("Test Failed: The dataset does not have 151 rows.")
-}
+# 1. Test column types and structure
+test_that("Column types are correct", {
+  expect_type(sim_data$vendor, "character")
+  expect_type(sim_data$product_name, "character")
+  expect_type(sim_data$old_price, "double")
+  expect_type(sim_data$price_change, "double")
+})
 
-# Check if the dataset has 3 columns
-if (ncol(analysis_data) == 3) {
-  message("Test Passed: The dataset has 3 columns.")
-} else {
-  stop("Test Failed: The dataset does not have 3 columns.")
-}
 
-# Check if all values in the 'division' column are unique
-if (n_distinct(analysis_data$division) == nrow(analysis_data)) {
-  message("Test Passed: All values in 'division' are unique.")
-} else {
-  stop("Test Failed: The 'division' column contains duplicate values.")
-}
+# 3. Check vendor in categorical columns
+test_that("vendor in categorical columns", {
+  unique_vendors <- unique(sim_data$vendor)
+  expect_true(length(unique_vendors) > 0)
+})
 
-# Check if the 'state' column contains only valid Australian state names
-valid_states <- c("New South Wales", "Victoria", "Queensland", "South Australia", 
-                  "Western Australia", "Tasmania", "Northern Territory", 
-                  "Australian Capital Territory")
 
-if (all(analysis_data$state %in% valid_states)) {
-  message("Test Passed: The 'state' column contains only valid Australian state names.")
-} else {
-  stop("Test Failed: The 'state' column contains invalid state names.")
-}
+# 3. Check product_name in categorical columns
+test_that("product_name in categorical columns", {
+  unique_vendors <- unique(sim_data$product_name)
+  expect_true(length(unique_vendors) > 0)
+})
 
-# Check if the 'party' column contains only valid party names
-valid_parties <- c("Labor", "Liberal", "Greens", "National", "Other")
+# 4. Test ranges for numeric variables
+test_that("Old prices are not negative", {
+  expect_gte(min(sim_data$old_price), 0)
+})
 
-if (all(analysis_data$party %in% valid_parties)) {
-  message("Test Passed: The 'party' column contains only valid party names.")
-} else {
-  stop("Test Failed: The 'party' column contains invalid party names.")
-}
 
-# Check if there are any missing values in the dataset
-if (all(!is.na(analysis_data))) {
-  message("Test Passed: The dataset contains no missing values.")
-} else {
-  stop("Test Failed: The dataset contains missing values.")
-}
+# 6. Test dataset size
+test_that("Dataset contains the expected number of rows", {
+  expect_lte(nrow(sim_data), 1000)
+})
 
-# Check if there are no empty strings in 'division', 'state', and 'party' columns
-if (all(analysis_data$division != "" & analysis_data$state != "" & analysis_data$party != "")) {
-  message("Test Passed: There are no empty strings in 'division', 'state', or 'party'.")
-} else {
-  stop("Test Failed: There are empty strings in one or more columns.")
-}
 
-# Check if the 'party' column has at least two unique values
-if (n_distinct(analysis_data$party) >= 2) {
-  message("Test Passed: The 'party' column contains at least two unique values.")
-} else {
-  stop("Test Failed: The 'party' column contains less than two unique values.")
-}
+#### Summary of Testing ####
+print("All tests passed successfully!")

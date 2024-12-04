@@ -1,52 +1,52 @@
 #### Preamble ####
-# Purpose: Simulates a dataset of Australian electoral divisions, including the 
-  #state and party that won each division.
-# Author: Rohan Alexander
-# Date: 26 September 2024
-# Contact: rohan.alexander@utoronto.ca
+# Purpose: Simulates a dataset of Canadian food price, including the product_name, 
+  # current_price, vendor 
+# Author: Ruikang Wang (1008238872)
+# Date: 3 December 2024
+# Contact: ruikang.wang@utoronto.ca
 # License: MIT
-# Pre-requisites: The `tidyverse` package must be installed
-# Any other information needed? Make sure you are in the `starter_folder` rproj
+# Pre-requisites: The `tidyverse`, 'dplyr' and 'here' package must be installed
 
 
 #### Workspace setup ####
 library(tidyverse)
-set.seed(853)
+library(dplyr)
+library(here)
 
+# Set seed for reproducibility
+set.seed(123)
 
-#### Simulate data ####
-# State names
-states <- c(
-  "New South Wales",
-  "Victoria",
-  "Queensland",
-  "South Australia",
-  "Western Australia",
-  "Tasmania",
-  "Northern Territory",
-  "Australian Capital Territory"
+vendors <- c("Metro", "Loblaws", "NoFrills", "SaveOnFoods", "TandT", "Voila", "Walmart")
+products <- c("Smoked Classic Cut Bacon", "Omega 3 Eggs", "Lactose-Free 2% Milk", "100% Whole Grain Ancient with Quinoa Bread")
+
+# Generate a simulated dataset
+n <- 1000  # Number of observations
+
+sim_data <- data.frame(
+  vendor = sample(vendors, n, replace = TRUE),
+  product_name = sample(products, n, replace = TRUE),
+  old_price = round(runif(n, min = 3, max = 10), 2),  # Old prices between 3 and 10
+  price_change = round(runif(n, min = -3, max = 3), 2) # Price change between -3 and 3, ensures it's reasonable
 )
 
-# Political parties
-parties <- c("Labor", "Liberal", "Greens", "National", "Other")
+# Ensure that old_price is non-negative (though it already is with the chosen range)
+sim_data <- sim_data %>%
+  mutate(old_price = ifelse(old_price < 0, 0, old_price))
 
-# Create a dataset by randomly assigning states and parties to divisions
-analysis_data <- tibble(
-  division = paste("Division", 1:151),  # Add "Division" to make it a character
-  state = sample(
-    states,
-    size = 151,
-    replace = TRUE,
-    prob = c(0.25, 0.25, 0.15, 0.1, 0.1, 0.1, 0.025, 0.025) # Rough state population distribution
-  ),
-  party = sample(
-    parties,
-    size = 151,
-    replace = TRUE,
-    prob = c(0.40, 0.40, 0.05, 0.1, 0.05) # Rough party distribution
-  )
-)
+# Calculate the current price
+sim_data <- sim_data %>%
+  mutate(current_price = old_price + price_change)
 
+# Ensure no negative current prices
+sim_data <- sim_data %>%
+  mutate(current_price = ifelse(current_price < 0, 0, current_price))
 
-#### Save data ####
-write_csv(analysis_data, "data/00-simulated_data/simulated_data.csv")
+# Remove rows with any missing values
+sim_data <- sim_data %>%
+  drop_na()
+
+# Preview the simulated dataset
+head(sim_data)
+
+# You can save this dataset to a CSV file if needed
+write_csv(price_change_data, here("data", "00-simulated_data", "simulated_data.csv"))

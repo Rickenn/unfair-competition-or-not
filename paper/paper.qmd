@@ -1,13 +1,12 @@
 ---
-title: "My title"
-subtitle: "My subtitle if needed"
+title: "Analyzing and forecasting for different vendors' relationships and pricing strategies"
+subtitle: "By historical price, vendor type and nature of goods"
 author: 
-  - First author
-  - Another author
-thanks: "Code and data are available at: [https://github.com/RohanAlexander/starter_folder](https://github.com/RohanAlexander/starter_folder)."
-date: today
+  - Ruikang Wang(1008238872)
+thanks: "Code and data are available at: [https://github.com/Rickenn/unfair-competition-or-not](https://github.com/Rickenn/unfair-competition-or-not)."
+date: 2024/12/03
 date-format: long
-abstract: "First sentence. Second sentence. Third sentence. Fourth sentence."
+abstract: "This study explores how old prices and different suppliers influence the current price of goods. By using Bayesian linear regression, the findings suggest that higher old prices often lead to slightly lower current prices. Supplier-specific effects also show varying strategies in adjusting price levels, but overall trends indicate eventual reductions."
 format: pdf
 number-sections: true
 bibliography: references.bib
@@ -18,131 +17,389 @@ bibliography: references.bib
 #| warning: false
 #| message: false
 
-library(tidyverse)
-library(palmerpenguins)
+package_list <- c("tidyverse", "kableExtra", "ggplot2", "dplyr", "here", "knitr", "rstanarm", "modelsummary", "readr", "lme4", "tinytex", "reshape2")
+
+install_and_load <- function(package_list) {
+  for (package in package_list) {
+    if (!require(package, character.only = TRUE)) {
+      install.packages(package)
+      library(package, character.only = TRUE)
+    }
+  }
+}
+
+install_and_load(package_list)
+
+analysis_data <- read_csv(here("data", "02-analysis_data", "analysis_data.csv"), show_col_types = FALSE)
+price_change_data <- read_csv(here("data", "02-analysis_data", "price_change_data.csv"), show_col_types = FALSE)
 ```
 
 
 # Introduction
+There is an old Chinese saying, “Hunger breeds discontentment”, which means that food is almost the most important thing in people's lives. In modern society, people's means of obtaining food has changed from hunting to consumption, and therefore the price of food has become a major criterion for reflecting the social situation. The analysis of food prices plays a vital role in understanding the Canadian consumer as well as the Canadian market. This paper focuses on the relationship between the prices of the different items and their own properties, supplier strategies, and historical prices.
+Four food items that are inseparable from breakfast, lunch, dinner, and snacks are chosen for this study: bread, milk, bacon, and eggs. Their pricing is affected by various factors including, but not limited to, supplier strategies, and historical prices.
+In terms of suppliers, all eight suppliers in the dataset are selected for this paper, as they cover the Chinese supermarket “TandT”, the Korean supermarket “Galleria”, and the more popular North American” and European supermarkets. Walmart” in China, ‘Galleria’ in Korea, and the more popular ‘Walmart’ in North America and ‘Voila’ in Europe. This makes the study more comprehensive and generalizable.
+The estimand of this paper is the current price of the commodity, which is determined based on the historical price, the type of supplier, and the nature of the commodity itself. By examining the effect of these predictor variables on the current price, an attempt is made to derive the relationship between suppliers， and the pattern of commodity pricing.
+By using Bayesian linear regression model, the findings suggest that higher old prices often lead to slightly lower current prices, as suppliers adjust prices to stay competitive [@payne2021managing]. Supplier-specific effects also show varying strategies in adjusting price levels, but overall trends indicate eventual reductions. While some suppliers (e.g., Metro, NoFrills, Voila) exhibit similar reductions, which might suggest possible collusion, the price trends over time do not show consistent alignment. Thus, the data does not provide sufficient evidence to support coordinated pricing behavior among these suppliers.
 
-Overview paragraph
-
-Estimand paragraph
-
-Results paragraph
-
-Why it matters paragraph
-
-Telegraphing paragraph: The remainder of this paper is structured as follows. @sec-data....
-
-
-
-
+Telegraphing paragraph: The remainder of this paper is structured as follows. @sec-data describes the clean data, and explains the variables for this research, @sec-model briefly indicates the basic of the model, @sec-result shows the prediction of current price, and justifies the relationship between different vendor, @sec-discussion explains the result, discusses the weakness and possible improve in the future.
 
 
 # Data {#sec-data}
+## Data Source
+The dataset used in this research is from Hammer [@filipp_hammer_2024], a publicly available repository of information designed to provide pricing data from many different retail chains. The dataset contains detailed information about product attributes such as product name, vendor, current price, date of changing price, brand and so on. Since it covers eight different suppliers and a variety of different commodities, we can use it to compare pricing between different suppliers and the timing of price changes between commodities, so that we can think about whether there is a pattern between the pricing of the various suppliers, and if so what that pattern is.
 
-## Overview
-
-We use the statistical programming language R [@citeR].... Our data [@shelter].... Following @tellingstories, we consider...
-
-Overview text
 
 ## Measurement
-	
-Some paragraphs about how we go from a phenomena in the world to an entry in the dataset.
+The data for this study was systematically downloaded, cleaned, analyzed, modeled and visualized using R [@citeR], a extensive statistical programming language. The following packages were used for this study.
+
+- **tidyverse** [@tidyverse]: Data visualization.
+
+- **kableExtra** [@kableExtra]: Construct Complex Table. 
+
+- **ggplot2** [@ggplot2]: Used for creating various types of visualizations. 
+
+- **dplyr** [@dplyr]: Data Manipulation. 
+
+- **here** [@here]: A Simpler Way to Find Your Files. 
+
+- **knitr** [@knitr]: A General-Purpose Package for Dynamic Report Generation in R. 
+
+- **rstanarm** [@rstanarm]: Providing a straightforward way to fit Bayesian regression models using Stan. 
+
+- **modelsummary** [@modelsummary]: Data and Model Summaries in R. 
+
+- **readr** [@readr]: Read Rectangular Text Data. 
+
+- **lme4** [@lme4]: Fitting Linear Mixed-Effects Models. 
+
+- **tinytex** [@tinytex]: Helper Functions to Install and Maintain 'TeX Live'. 
+
+- **reshape2** [@reshape2]: Reshaping Data. 
+
+- **arrow** [@arrow]: Used for efficiently reading and writing large datasets.
+
+- **_Telling Story With Data_** [@tswd]: This book provide a lot of example for code and explain the statistic concepts to help us analysis our study. 
+
+```{r}
+#| label: tbl-voila_milk
+#| tbl-cap: "Voila - Lactose-Free 2% Milk"
+#| echo: false
+#| warning: false
+#| message: false
+# Load necessary libraries
+library(dplyr)
+library(knitr)
+library(readr)
+
+# Convert 'nowtime' to DateTime format if necessary
+analysis_data$nowtime <- as.POSIXct(analysis_data$nowtime, format = "%Y-%m-%d %H:%M:%S")
+
+# Filter the data for the specified conditions
+filtered_data <- analysis_data %>%
+  filter(
+    vendor == "Voila",
+    product_name == "Lactose-Free 2% Milk",
+    nowtime >= as.POSIXct("2024-08-05 11:18:00"),
+    nowtime <= as.POSIXct("2024-08-10 11:09:00")
+  )
+
+# Present the filtered data as a table
+kable(filtered_data)
+```
+@tbl-voila_milk is a segment that I specifically cut out to best represent the dataset used in this research.
+@tbl-voila_milk indicates that between the time points “2024-08-05 11:18:00” and “2024-08-10 11:09:00”, the distributor "Voila" decreased the price of the product “Lactose-Free 2% Milk” from 6.49 to 5.99, and the price per 100ml decreased from 0.32 to 0.30, both unit is dollars.
+
 
 ## Outcome variables
+### Current Price
+This variable represents the price of the commodity at the time of data collection. A model is built based on this variable to investigate what variables affect vendor pricing and how these variables affect the price of goods. The study of this variable allows consumers or other suppliers to make predictions and references before consuming. In this study, in order to model *current_price*, statistics on product categories, suppliers, and historical prices were conducted.
 
-Add graphs, tables and text. Use sub-sub-headings for each outcome variable or update the subheading to be singular.
-
-
-
-Some of our data is of penguins (@fig-bills), from @palmerpenguins.
 
 ```{r}
-#| label: fig-bills
-#| fig-cap: Bills of penguins
-#| echo: false
-
-ggplot(penguins, aes(x = island, fill = species)) +
-  geom_bar(alpha = 0.8) +
-  scale_fill_manual(values = c("darkorange","purple","cyan4"),
-                    guide = "none") +
-  theme_minimal() +
-  facet_wrap(~species, ncol = 1) +
-  coord_flip()
-```
-
-Talk more about it.
-
-And also planes (@fig-planes). (You can change the height and width, but don't worry about doing that until you have finished every other aspect of the paper - Quarto will try to make it look nice and the defaults usually work well once you have enough text.)
-
-```{r}
-#| label: fig-planes
-#| fig-cap: Relationship between wing length and width
+#| label: tbl-cp_product
+#| tbl-cap: Statistics for Current Price by Product
 #| echo: false
 #| warning: false
 #| message: false
 
-analysis_data <- read_csv(here::here("data/02-analysis_data/analysis_data.csv"))
+# Filter out rows with non-numeric values for current_price and ensure it is numeric
+analysis_data <- analysis_data %>%
+  mutate(current_price = as.numeric(current_price)) %>%
+  filter(!is.na(current_price))
 
-analysis_data |> 
-  ggplot(aes(x = width, y = length)) +
-  geom_point(alpha = 0.8) +
-  theme_minimal() +
-  labs(x = "Wing width (mm)",
-       y = "Wing length (mm)")
+# Group by product_name and calculate summary statistics for current_price
+summary_table <- analysis_data %>%
+  group_by(product_name) %>%
+  summarise(
+    min = min(current_price, na.rm = TRUE),
+    max = max(current_price, na.rm = TRUE),
+    mean = mean(current_price, na.rm = TRUE),
+    median = median(current_price, na.rm = TRUE),
+    sd = sd(current_price, na.rm = TRUE)
+  )
+
+# Print the summary table using kable for nice formatting
+kable(summary_table)
 ```
+@tbl-cp_product summarizes the current price statistics for four products that this study chosen. "100% Whole Grain Ancient with Quinoa Bread" has the lowest price variability, while "Smoked Classic Cut Bacon" shows the highest variability with the widest price range. The average prices for the products are fairly close to their median prices, indicating a generally even distribution of prices.
 
-Talk way more about it. 
 
 ## Predictor variables
-
-Add graphs, tables and text.
-
-Use sub-sub-headings for each outcome variable and feel free to combine a few into one if they go together naturally.
+The predictor variables in this study are *product_name*, *vendor* and *old_price*.These variables can reflect the differences and similarities in the pricing strategies of different vendors for different kinds of goods.
 
 
+### Product Name
+The predictor variable *product_name* is a categorization of four selected representative products, which are “Smoked Classic Cut Bacon”, “Lactose-Free 2% Milk”, “100% Whole Grain Ancient with Quinoa Bread”, and “Omega 3 Eggs”. ”, “100% Whole Grain Ancient with Quinoa Bread”, and “Omega 3 Eggs”. These four items were chosen because they are common enough to be found in any large supermarket, not just the vendors in this study, which makes this report universal and allows the results of this study to be applied to most people's lives. And these four items can be “complementary” - an increase in the sales of one item can lead to an increase in the sales of the other items [@bansak2015economics], which is an economic concept. As an example, breakfast is usually milk and bread with fried eggs and bacon. By studying them, it may also be possible to find out whether the such nature of goods (complementary) has an effect on vendor pricing.
+
+```{r}
+#| label: fig-cp_voila
+#| fig-cap: "Current Price Over Time for Vendor Voila"
+#| echo: false
+#| warning: false
+#| message: false
+voila_data <- analysis_data %>%
+  filter(vendor == "Voila")
+
+# Create the time series plot
+ggplot(voila_data, aes(x = nowtime, y = current_price, color = product_name, group = product_name)) +
+  geom_line() +
+  labs(
+    x = "Month",
+    y = "Current Price",
+    color = "Product Name"
+  ) +
+  theme_minimal()
+```
+@fig-cp_voila represents price distribution of different products of *vendor* "Voila". The “Smoked Classic Cut Bacon” showing the biggest price change, between 6 dollars and 8 dollars. The price of “100% Whole Grain Ancient with Quinoa Bread” changed most frequently, four times between August and November. On the other hand, the price of “Omega 3 Eggs” is incredibly stable, and according to the chart it has never changed.
 
 
+### Vendor
+The predictor variable *vendor* is the name of eight the larger supermarkets in Toronto, which are “Voila”, “Galleria”, “Loblaws”, “Metro”, “NoFrills”, “SaveOnFoods”, and “Loblaws”. “Voila”, ‘Galleria’, ‘Loblaws’, ‘Metro’, ‘NoFrills’, ‘SaveOnFoods’. “TandT”, ‘Walmart’. They represent the consumer preferences and pricing strategies of Chinese, Korean, European, and North American supermarkets for different food products.
+
+```{r}
+#| label: fig-cp_egg_vendor
+#| fig-cap: "Current Price for Omega 3 Eggs by Vendor"
+#| echo: false
+#| warning: false
+#| message: false
+omega_3_eggs_data <- analysis_data %>%
+  filter(product_name == "Omega 3 Eggs")
+
+# Create line plot for "current_price" over time with different lines for different vendors
+ggplot(omega_3_eggs_data, aes(x = nowtime, y = current_price, color = vendor, group = vendor)) +
+  geom_line() +
+  labs(
+    x = "Month",
+    y = "Current Price",
+    color = "Vendor"
+  ) +
+  theme_minimal()
+```
+@fig-cp_egg_vendor shows the price distribution with time of Omega 3 Eggs, different color means different *vendor*. "NA" is the supplier "SaveOnFoods" because they has the same "product_id". Base on the data distribution, *vendor* "TandT" changed prices most frequently and by the largest magnitude, but in the end the prices stayed at their lowest. "Walmart" also changed the price but not frequent, and stayed at the highest price of whole market, around 7.99 dollars, after the end of August. "Voila" has the most stable price for Omega 3 Eggs, this can be corroborated with the previous "Voila" price distribution by commodity, which is more evidence of the reliability of the data.
 
 
+### Old Price
+The predictor variable *old_price* is the price of each commodity on the day before the price change. Combining it with *current_price* provides insight into the price change habits of each vendor. Combining it with the predictor variable *vendor* allows us to study the response of each vendor to the strategies of other vendors. For example, do they change their prices when other vendors raise their prices in order to make higher immediate profits and stabilize the market, or do they choose Malicious price cutting to expand the market and achieve monopoly status.
+
+```{r}
+#| label: tbl-op_product
+#| tbl-cap: "Statistics for Old Price by Product"
+#| echo: false
+#| warning: false
+#| message: false
+
+# Group by product_name and calculate summary statistics for current_price
+summary_table <- price_change_data %>%
+  group_by(product_name) %>%
+  summarise(
+    min = min(old_price, na.rm = TRUE),
+    max = max(old_price, na.rm = TRUE),
+    mean = mean(old_price, na.rm = TRUE),
+    median = median(old_price, na.rm = TRUE),
+    sd = sd(old_price, na.rm = TRUE)
+  )
+
+# Print the summary table using kable for nice formatting
+kable(summary_table)
+```
+@tbl-op_product summarizes the old prices for the same four products. Compared to the summary statistics for current prices, "Smoked Classic Cut Bacon" consistently has the highest price, and both its old and current prices exhibit the largest variability (highest standard deviation). Meanwhile, "100% Whole Grain Ancient with Quinoa Bread" has the lowest variability in both current and old prices. The trends indicate that there have been moderate changes in average prices across products, but the relative relationships between products have remained similar.
 
 
-# Model
+```{r}
+#| label: fig-compare_cpop_egg
+#| fig-cap: "Comparison of Current Price and Old Price for Omega 3 Eggs"
+#| echo: false
+#| warning: false
+#| message: false
+new_data <- price_change_data %>%
+  mutate(current_price = old_price + price_change) %>% # Calculate the new variable
+  select(-price_change)
+  omega_3_eggs_data <- new_data %>%
+  filter(product_name == "Omega 3 Eggs")
 
-The goal of our modelling strategy is twofold. Firstly,...
+# Reshape data for comparison
+omega_3_eggs_data_long <- omega_3_eggs_data %>%
+  tidyr::pivot_longer(cols = c(current_price, old_price), names_to = "Price_Type", values_to = "Price")
 
-Here we briefly describe the Bayesian analysis model used to investigate... Background details and diagnostics are included in [Appendix -@sec-model-details].
+# Create boxplot
+ggplot(omega_3_eggs_data_long, aes(x = Price_Type, y = Price)) +
+  geom_boxplot() +
+  labs(
+    x = "Price Type",
+    y = "Price"
+  ) +
+  theme_minimal()
+```
+The boxplot @fig-compare_cpop_egg compares the current price and old price for "Omega 3 Eggs". The current price has more variability, as indicated by a wider box, while the old price is more consistent. The median of the current price is 6.6 which slightly higher than that of the old price, showing a general increase in price. The overall trend suggests that in the whole market, the price of "Omega 3 Eggs" has increased, with more fluctuation in the current price compared to the previous price. The interesting thing is that the lowest of the old and new prices remain the same, still 6.49 dollars, even both except their outlier.
+
+
+# Model {#sec-model}
+Here we briefly describe the Bayesian analysis model used to investigate how different initial prices between different commodities from different suppliers can affect subsequent price changes. Background details and diagnostics are included in [Appendix -@sec-model-details].
+
 
 ## Model set-up
-
-Define $y_i$ as the number of seconds that the plane remained aloft. Then $\beta_i$ is the wing width and $\gamma_i$ is the wing length, both measured in millimeters.  
+Define outcome variable $y_i$ as the *current_price* of products at time $i$, expressed in dollars. Then define predictor variables are $x_1$ that is the *old_price* and also expressed in dollars, $x_2$ that is the *vendor*, and $x_3$ that is the *product_name*, which $x_2$ and $x_3$ are categorical variables.  
 
 \begin{align} 
-y_i|\mu_i, \sigma &\sim \mbox{Normal}(\mu_i, \sigma) \\
-\mu_i &= \alpha + \beta_i + \gamma_i\\
-\alpha &\sim \mbox{Normal}(0, 2.5) \\
-\beta &\sim \mbox{Normal}(0, 2.5) \\
-\gamma &\sim \mbox{Normal}(0, 2.5) \\
-\sigma &\sim \mbox{Exponential}(1)
+y_i | \mu_i, \sigma &\sim \text{Normal}(\mu_i, \sigma) \\
+\mu_i &= \beta_1 x_{1i} + \beta_2 x_{2i} + \beta_3 x_{3i} + \alpha
 \end{align}
+
+Explanation of each coefficient:
+- $\beta_1$ can indicate how old prices affect current prices, considering the impact of historical prices is helpful in determining whether past prices have an ongoing impact on current pricing decisions.
+- $\beta_2$ represents the impact of vendors, which is a categorical variable. It helps us to recognize the different pricing strategies of different vendors and make unique predictions based on different vendors.
+- $\beta_3$ is also a categorical variable. It exhibits the effect of different types of goods on prices. Based on it, we can find out what kind of goods are price sensitive and thus understand the pricing strategy of the merchants for different goods.
+- $\alpha$ is the intercept term that represents the standard price when all the predictors are at the reference level.
 
 We run the model in R [@citeR] using the `rstanarm` package of @rstanarm. We use the default priors from `rstanarm`.
 
 
-### Model justification
+## Model Priors
+For the model’s intercepts, a normal prior distribution is typically used with a mean of 0. This keeps the intercept results of the model from being too close to the center.
+Similarly, the coefficients in the model are assigned a normal prior distribution with a mean of zero. The standard deviation was set at 2.5 to increase the flexibility of the experimental results without making the results meaningless due to excessive differences.
 
-We expect a positive relationship between the size of the wings and time spent aloft. In particular...
+\begin{align} 
+\alpha &\sim \text{Normal}(0, 2.5) \\
+\beta_1 &\sim \text{Normal}(0, 2.5) \\
+\beta_2 &\sim \text{Normal}(0, 2.5) \\
+\beta_3 &\sim \text{Normal}(0, 2.5)
+\end{align}
 
-We can use maths by including latex between dollar signs, for instance $\theta$.
+This priors are designed to be weakly informative, allowing the model to draw conclusions based almost entirely on the data.
 
 
-# Results
+## Model justification
+By using *vendor* and *product_name* as categorical variables, we can not only analyze how different vendors and different products affect prices, but also analyze the nature of the products. The same product with different suppliers can be considered as a “substitute” - this type of product can be used as a alternative choice for each other [@bansak2015economics], so if the sales of one product go down, the sales of the other one will go up accordingly, this is an economic concept. The different commodities selected for this study are “complementary” to each other, as explained in the "data" section. The analysis of the variable *vendor* also allows us to explore whether there is bad bidding and collusion among suppliers in order to monopolize the market.
+The reason for using *old_price* as a numerical variable is that, according to price inertia, past prices may affect new pricing.
 
-Our results are summarized in @tbl-modelresults.
 
+### Assumption
+The model is assumed to be linear, both between the response variable and the predictor variable. This makes the model simple and easy to understand. And the model can visualize the relationship between the variables. It is more likely to improve the consistency of the model under specific conditions.
+However, assuming linearity may lead to model mis-specification. This means that important interactions or curvatures in the data are ignored, leading to biased or incorrect estimates and predictions. And linear regression requires assumptions about residual errors. If these assumptions are violated, the predictions of future price may become unreliable.
+
+
+### Different model comparsion
+I have tried to do a linear model before because it was assumed at the outset that there was a linear relationship between old price and current price, but the linear model came up with predictions that were far from the true value.    This may be due to the fact that the linear model is monotonic in the direction of change, its prediction is a straight line with only one direction, either up or down, but this is not the case with price movements. Although the study concludes that the price is generally going down (which will be analyzed in more detail in a later section), there are often rises in the process of decline, just with different magnitudes and frequencies, so the linear model is often subject to a great deal of error.    Bayesian linear regression has an advantage over simple linear models in dealing with uncertainty by providing flexibility for hierarchical modeling and the ability to deal with complex model structures, so that the current price predicted by the Bayesian model, although in error from the actual price, is almost has identical turning point with actual prices, and these small errors cannot hide the powerful analytical ability of the Bayesian model. This is also the reason why I finally chose the Bayesian model.
+
+
+# Results {#sec-result}
+## Graph analysis
+```{r}
+#| label: fig-pt_milk
+#| fig-cap: "Price Trends Over Time for Lactose-Free 2% milk"
+#| echo: false
+#| warning: false
+#| message: false
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+
+# Convert 'nowtime' to DateTime format if necessary
+analysis_data$nowtime <- as.POSIXct(analysis_data$nowtime, format = "%Y-%m-%d %H:%M:%S")
+
+# Filter the data for the specified product_ids
+filtered_data <- analysis_data %>%
+  filter(product_id %in% c(4068860, 1704900, 2892726, 3677991))
+
+# Create the graph
+ggplot(filtered_data, aes(x = nowtime, y = as.numeric(current_price), color = vendor)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    x = "Month",
+    y = "Current Price",
+    color = "Vendor"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r}
+#| label: fig-pt_bread
+#| fig-cap: "Price Trends Over Time for 100% whole Grains Ancient with Quinoa Bread"
+#| echo: false
+#| warning: false
+#| message: false
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+
+# Convert 'nowtime' to DateTime format if necessary
+analysis_data$nowtime <- as.POSIXct(analysis_data$nowtime, format = "%Y-%m-%d %H:%M:%S")
+
+# Convert 'nowtime' to DateTime format if necessary
+analysis_data$nowtime <- as.POSIXct(analysis_data$nowtime, format = "%Y-%m-%d %H:%M:%S")
+
+# Filter the data for the specified product IDs
+filtered_data <- analysis_data %>%
+  filter(product_id %in% c(712206, 1688551, 2332786, 2881295, 3357385, 3998031))
+
+# Create the graph
+ggplot(filtered_data, aes(x = nowtime, y = as.numeric(current_price), color = vendor)) +
+  geom_line() +
+  labs(
+    x = "Month",
+    y = "Current Price",
+    color = "Vendor"
+  ) +
+  theme_minimal()
+```
+```{r}
+#| label: fig-pt_bacon
+#| fig-cap: "Price Trends Over Time for Smoked Classic Cut Bacon"
+#| echo: false
+#| warning: false
+#| message: false
+# Convert 'nowtime' to DateTime format
+analysis_data$nowtime <- as.POSIXct(analysis_data$nowtime, format = "%Y-%m-%d %H:%M:%S")
+
+# Filter the data for the specified product_ids
+filtered_data <- analysis_data %>%
+  filter(product_id %in% c(1695676, 2886297, 3360423, 4073728))
+
+# Create the graph
+ggplot(filtered_data, aes(x = nowtime, y = as.numeric(current_price), color = vendor)) +
+  geom_line(size = 1) + 
+  labs(
+    x = "Month",
+    y = "Current Price",
+    color = "Vendor"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The three figures depict the price changes over time for lactose-free milk, whole grain bread, and smoked bacon sold by different vendors.
+
+In @fig-pt_milk, most sellers (Loblaws, NoFrills, and Walmart) ended with prices between 6.0 and 6.5, while TandT remained above 7.0, indicating it was an outlier with a consistently higher price. However, based on the curves of Loblaws and NoFrills, we find that when the distribution of their price changes is reversed, one party chooses to reduce prices when the other increases prices, and vice versa, which is consistent with our definition of “substitution”. 
+@fig-pt_bread shows that vendors like Loblaws, Metro, NoFrills, and Voila ended with prices in a narrower range (4.25 to 4.75), suggesting a convergence of pricing strategies for whole grain bread. 
+In @fig-pt_bacon, Walmart and SaveOnFoods maintained stable prices of $9.00 throughout, while NoFrills also eventually increased its price to match this level.
+
+Overall, the prices, regardless of their initial differences, tended to converge and stabilize across most sellers over time, indicating possible market influences that drive similar pricing across vendors. Although the prices end up converging in a close range, the paths of price changes are all different, so there is no reason to judge the suppliers as having cooperative behavior. And it is true that a change in the price of a commodity will have the opposite effect on its substitute, whether that change is up or down.
+
+
+## Modeling
 ```{r}
 #| echo: false
 #| eval: true
@@ -151,61 +408,113 @@ Our results are summarized in @tbl-modelresults.
 
 library(rstanarm)
 
-first_model <-
-  readRDS(file = here::here("models/first_model.rds"))
+current_price_model <-
+  readRDS(file = here::here("models/current_price_model.rds"))
 ```
-
 ```{r}
 #| echo: false
 #| eval: true
 #| label: tbl-modelresults
-#| tbl-cap: "Explanatory models of flight time based on wing width and wing length"
+#| tbl-cap: "Explanatory models of Current price based on Old price and vendor and Product type"
 #| warning: false
 
 modelsummary::modelsummary(
   list(
-    "First model" = first_model
+    "Current Price model" = current_price_model
   ),
   statistic = "mad",
   fmt = 2
 )
 ```
+@tbl-modelresults demonstrates the findings of the Bayesian model used to analyze current price and helps to analyze the parameter estimates and diagnostic measures. This model explains how the predictor variables of old price, vendor, and product type affect the current price.
+
+The Intercept 2.10 is the starting point, it means the current price starts at 2.10 when old price is 0 and other situation remain the same.
+
+The coefficient of old Price is -0.10 which means that the old price and current price are negatively correlated. If the old price goes up by 1 unit, the new price is expected to decrease slightly by 0.10 units. 
+
+Vendor Effects:
+Different stores affect the price differently compared to the reference store. For example, Metro has a value of -0.53, meaning products in Metro tend to have a price that is 0.53 units lower compared to the reference store. Other stores like Loblaws (-0.32), NoFrills (-0.50), etc., also show negative values, meaning their prices are lower compared to the baseline.
+
+Product Effects:
+Lactose-Free 2% Milk (0.83), Omega 3 Eggs (0.65), and Smoked Classic Cut Bacon (0.98): These numbers mean these products tend to have higher prices compared to a baseline product. For example, Smoked Classic Cut Bacon has a value of 0.98, meaning it’s more expensive compared to the reference product.
+
+Model Fit Metrics:
+•	Log Likelihood (Log.Lik.) = -124.707: This is a number that shows how well the model fits the data. A less negative value is better and means the model fits the data more closely.
+•	Expected Log Predictive Density (ELPD = -133.5), Leave-One-Out Information Criterion (LOOIC = 266.9), and Widely Applicable Information Criterion (WAIC = 265.8): They can help us understand if the model is good at predicting new data. The low values means this model predicts with fancy performance.
+•	Root Mean Squared Error (RMSE = 0.70): This number tells us how far off our predictions are on average. An RMSE of 0.70 means there is some difference between what the model predicted and what actually happened, but it’s not too bad.
 
 
+# Discussion {#sec-discussion}
+## Explanation of Results
+Research findings show that if the old price of a good increases, the current price tends to decrease slightly. This is because price reduction is the best way to expand when there is a change in the market.
+The impact of different suppliers is also taken into account. Each store has its own impact on prices compared to the baseline, but overall, regardless of the initial price increase, individual suppliers will eventually lower the price of an item given enough time. And different suppliers may have their own unique pricing strategies that will adjust the nodes, frequency, and magnitude of price reductions differently.
+Overall, this study helps explain how old prices and store selection affect the final price of a product, highlighting pricing trends across different suppliers. This is a useful way to understand how current pricing changes based on past data and where products are sold. 
 
 
-# Discussion
+## Market Collusion or not
+All the vendors listed (e.g., Voila: -0.43, Metro: -0.53, NoFrills: -0.50, SaveOnFoods: -0.14, etc.) have negative coefficients compared to the reference category, indicating that the current price is generally reduced for each of these vendors relative to the baseline. A similar trend across vendors could indicate coordinated efforts to keep prices low for competitive advantage. However, this observation alone is not enough to confirm collusion, as many market factors could explain these pricing strategies.
+If the vendors have similar levels of reduction in prices (such as NoFrills, Metro, and Voila with coefficients close to each other), this may raise suspicion of coordinated pricing behavior, especially if it is observed consistently over time. Collusion often manifests in uniform price movements among competitors to avoid direct competition. Therefore NoFrills, Metro, and Voila are the three vendors most likely to collude. However, if we look back at the images of the price changes over time for each commodity we see that the trends in the price movements of these three commodities are not similar. So based on the available data and modeling, we cannot accept the hypothesis that they are colluding with each other, and their similar coefficients may just be coincidental.
 
-## First discussion point {#sec-first-point}
 
-If my paper were 10 pages, then should be be at least 2.5 pages. The discussion is a chance to show off what you know and what you learnt from all this. 
+## Prediction for future
+```{r}
+#| label: fig-compare_ap_bacon
+#| fig-cap: "Comparison of Actual and Predicted Prices for Classic Cut Bacon at Loblaws"
+#| echo: false
+#| warning: false
+#| message: false
+new_data <- price_change_data %>%
+  mutate(current_price = old_price + price_change) %>% # Calculate the new variable
+  select(-price_change)
+loblaws_bacon_data <- new_data %>%
+  filter(vendor == "Loblaws", product_name == "Smoked Classic Cut Bacon")
+# Use the model to predict the future price for the filtered data
+predictions <- predict(current_price_model, newdata = loblaws_bacon_data)
 
-## Second discussion point
+# Add the predictions to the original dataset
+loblaws_bacon_data <- loblaws_bacon_data %>%
+  mutate(predicted_price = predictions)
 
-Please don't use these as sub-heading labels - change them to be what your point actually is.
+# Create a comparison plot
+ggplot(loblaws_bacon_data, aes(x = change_date)) +
+  geom_line(aes(y = current_price, color = "Actual Price"), size = 1) +
+  geom_line(aes(y = predicted_price / 0.25, color = "Predicted Price"), size = 1, linetype = "dashed") +
+  labs(
+    x = "Month",
+    y = "Price",
+    color = "Legend"
+  ) +
+  theme_minimal()
+```
+The @fig-compare_ap_bacon shows the comparison between the actual and predicted prices for "Classic Cut Bacon" at Loblaws over time. The actual prices demonstrate significant fluctuations, including sharp increases and rapid drops, suggesting high volatility in the pricing of this product. Specifically, the price appears to vary between 5 and 9 dollars, with extreme changes observed within a short time period.
+In contrast, the predicted price trend, shown as a dashed line, is much smoother and indicates a gradual upward movement, followed by a peak and a slight downward adjustment. The model predicts a more stable price trajectory compared to the actual volatile pattern. The discrepancy between the actual and predicted trends suggests that while the historical data shows significant instability, the model expects this instability to smooth out over time.
+Notably, towards the end of the observed period, the predicted price exceeds the actual price, which implies that the model anticipates an increase in prices after the recent decline. This predicted upward trend indicates a possible recovery or price correction that may occur in the near future.
+In summary, while the actual price data reflects considerable volatility for "Classic Cut Bacon" at Loblaws, the model suggests that the future price trend will be more stable, with moderate upward movement. This prediction may be optimistic, assuming that the factors driving the extreme price changes previously will stabilize. It is essential to acknowledge that price predictions are based on historical patterns, and external factors such as market promotions, supply issues, or unexpected changes in consumer demand could result in future prices deviating from these predictions. Overall, the graph suggests that the price of "Classic Cut Bacon" is expected to rise and stabilize, but real-world dynamics could still impact actual outcomes.
 
-## Third discussion point
 
 ## Weaknesses and next steps
+### Weaknesses
+The model uses a linear approach, which might not capture complex relationships between variables. Real-world pricing may involve non-linear effects or interactions that this model does not capture. The model also does not include interaction terms, which means it does not account for situations where the effect of one variable depends on another. For example, the effect of a vendor on price might depend on the specific product, which this model cannot capture without interaction terms.
 
-Weaknesses and next steps should also be included.
+
+### Next steps
+To address the limitations of linear modeling and the absence of interaction terms, consider the following improvements. First, to capture non-linear relationships, you can include polynomial terms or use Generalized Additive Models (GAMs), which provide more flexibility. Tree-based models like Random Forest or Gradient Boosting Machines can also effectively capture non-linear and complex relationships without assuming a specific form for the data. Second, to account for interaction effects between variables, add explicit interaction terms, such as between the vendor and product name, to capture scenarios where one variable’s impact depends on another. Generalized Additive Mixed Models (GAMMs) can also be used to combine smooth functions with random effects to account for complex interactions. Next steps include experimenting with different models, adding interaction terms, and conducting model diagnostics to determine which approach yields the best performance. Evaluating different methods using metrics such as RMSE, cross-validation, and residual analysis will help identify the most suitable model to capture real-world pricing behaviors accurately. By incorporating non-linearities and interaction effects, the model will become more robust and better represent the intricacies of the dataset.
 
 \newpage
 
 \appendix
 
 # Appendix {-}
+## Additional data details {#sec-data_details}
+The dataset “price_change_data” used to construct the model starts with two numeric variables *price_change* and *old_price*, but because the code for building the Bayesian model cannot have negative numbers, and as we all know, prices cannot only go up but not down, so we have to do something about “price_change_data”.  By adding a new variable *current_price* to make the data usable, because the price of any commodity will not be negative.  However, this new data is used to generate the model and all the analysis in this paper is still based on the unchanged “price_change_data” and “analysis_data”.  The formula for *current_price* is: *current_price* = *old_price* + *price_change*.
 
 
-# Additional data details
+## Model details {#sec-model-details}
+### Posterior predictive check
 
-# Model details {#sec-model-details}
+In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive check. o	The thick dark line represents the actual data distribution (y). The lighter lines represent the distributions from posterior predictive samples (y_rep). This graph represents that the predicted data roughly follow the same pattern as the actual data. This suggests that the model is doing a reasonable job in predicting the shape of the data, but there are some discrepancies at the tails, indicating potential areas for improvement.
 
-## Posterior predictive check
-
-In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive check. This shows...
-
-In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. This shows... 
+In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. This shows that the posterior estimates (colored dots) have diverged significantly from the priors for several parameters, the *product_name* and *vendor* are good example, which suggests that the data was informative for these estimates. It indicates that the model has learned from the data, as seen by the divergence of the posteriors from the priors. The influence of data is strong on several parameters.
 
 ```{r}
 #| eval: true
@@ -217,22 +526,22 @@ In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. Th
 #| fig-cap: "Examining how the model fits, and is affected by, the data"
 #| fig-subcap: ["Posterior prediction check", "Comparing the posterior with the prior"]
 
-pp_check(first_model) +
+pp_check(current_price_model) +
   theme_classic() +
   theme(legend.position = "bottom")
 
-posterior_vs_prior(first_model) +
+posterior_vs_prior(current_price_model) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1") +
   theme(legend.position = "bottom") +
   coord_flip()
 ```
 
-## Diagnostics
+### Diagnostics
 
-@fig-stanareyouokay-1 is a trace plot. It shows... This suggests...
+@fig-stanareyouokay-1 is a trace plot. It also called MCMC (Markov Chain Monte Carlo) sampling process. It shows the sampling chains for each parameter in the model. Each chain looks fuzzy like a caterpillar, and both of them show good mixing and a consistent pattern. This suggests that the MCMC chains have converged and are sampling effectively from the posterior distribution, so the chains are exploring the parameter space effectively and are converging.
 
-@fig-stanareyouokay-2 is a Rhat plot. It shows... This suggests...
+@fig-stanareyouokay-2 is a Rhat plot. It shows shows the potential scale reduction factor, commonly called R-hat, for each parameter. In this plot, all the R-hat values are equal to or below 1.05, which is a good sign that convergence has been achieved.
 
 ```{r}
 #| echo: false
@@ -240,19 +549,145 @@ posterior_vs_prior(first_model) +
 #| message: false
 #| warning: false
 #| label: fig-stanareyouokay
-#| fig-cap: "Checking the convergence of the MCMC algorithm"
+#| fig-cap: "Checking the convergence"
 #| fig-subcap: ["Trace plot", "Rhat plot"]
 #| layout-ncol: 2
 
-plot(first_model, "trace")
+plot(current_price_model, "trace")
 
-plot(first_model, "rhat")
+plot(current_price_model, "rhat")
 ```
 
 
 
 \newpage
 
+
+# Idealized Methodology for a Survey {#sec-survey}
+## Overview
+Idealized survey methods capture the perceptions of consumers, as well as employees and rule makers who actually work in this market, about the market's food pricing. The survey is designed to determine simulations of purchasing decisions, judgments about the fairness of the market, and preferred sales tactics for vendors. This approach allows for a more comprehensive understanding of the factors that influence the dynamics of food pricing in Canada thereby corroborating or modifying the analysis in this paper and laying the groundwork for providing a truly rational, useful analytical model.
+
+
+### Question Types
+The survey focuses on self-identity, eating habits, living habits, and shopping styles, with multiple-choice and single-response questions, and also asks participants to think about the other person's point of view, so as to explore what the other person might be thinking about in the mind of each participant.
+
+
+### Question List
+1. What self-identify you prefer?
+  - Customer
+  - vendor staff
+  - vendor manager
+  
+2. How often you shopping?
+  - Daily
+  - Weekly
+  - Monthly
+  - Other
+  
+3. Which is your primary way of consumption?
+  - Offline
+  - Online
+  
+4. Which vendor do you often go? (multiple)
+  - Voila
+  - Metro
+  - TandT
+  - Save On Foods
+  - Loblaws
+  - No Frills
+  - Galleria
+  - Walmart
+  - other
+  
+5. Which factors do you most care for your shopping?
+  - Price
+  - Quality
+  - Environment
+  - Convenience
+  
+6. Do you have breakfast in recently one month?
+  - Often
+  - Occasionally
+  - Barely
+  - Never
+  
+7. If you have breakfast, which you will eat most frequent?
+  - Rice
+  - Noodle
+  - Bread
+  - Cereal
+  
+8. If you have breakfast, which may be your source of protein? (multiple)
+  - Egg
+  - Bacon
+  - Steak
+  - Protein bar
+  
+9. If you have breakfast, which is your drink?
+  - Water
+  - Milk
+  - Juice
+  - Alcohol
+  - Soft drink
+  
+10. If you are the manager for vendor, please make a combo by choose four of below food.
+  - Rice
+  - Noodle
+  - Bread
+  - Cereal
+  - Egg
+  - Bacon
+  - Steak
+  - Protein bar
+  - Water
+  - Milk
+  - Juice
+  - Alcohol
+  - Soft drink
+  
+11. If you are the customer, please make a combo by choose four of below food that you want be provided in vendor.
+  - Rice
+  - Noodle
+  - Bread
+  - Cereal
+  - Egg
+  - Bacon
+  - Steak
+  - Protein bar
+  - Water
+  - Milk
+  - Juice
+  - Alcohol
+  - Soft drink
+  
+12. If you are customer, will you still by this four foods together you choose before even no combo?
+  - Yes
+  - No
+  - Base on situation
+  
+13. If the price of foods other than the combo you choose drops, will you still buy these four foods?
+  - Yes
+  - No
+  - Base on situation
+  
+  
+## Recruitment Strategy
+### Online questionnaire
+Extensive participant databases by age, income and geographic location, and distribute online questionnaires. This method of collection are cheap, convenient, and comprehensive, allowing for diverse responses. The data is automatically recorded.
+
+
+### offline interview/questionnaire
+Distribute questionnaires in vendors, or staffs and managers do short interviews with customers as they check out. This way provide a personal touch, allowing for better rapport and engagement between the interviewer and the respondent, which can lead to more detailed and honest responses.
+
+
+
+
+
+
+
+
+
+\newpage
 
 # References
 
